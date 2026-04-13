@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BGF Optional Theta Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0e17;
+  --surface: #111827;
+  --surface2: #1a2234;
+  --border: #2d3748;
+  --text: #f1f5f9;
+  --text-dim: #94a3b8;
+  --accent: #6366f1;
+  --green: #10b981;
+  --red: #ef4444;
+  --amber: #f59e0b;
+  --cyan: #06b6d4;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+.container { max-width: 1600px; margin: 0 auto; padding: 2rem; }
+h1 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, #6366f1, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.subtitle { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 2rem; }
+
+/* Upload zone */
+.upload-box {
+  background: var(--surface);
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  max-width: 400px;
+  margin-bottom: 2rem;
+}
+.upload-box:hover { border-color: var(--accent); background: var(--surface2); }
+.upload-box.loaded { border-color: var(--green); border-style: solid; }
+.upload-box input { display: none; }
+.upload-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.upload-title { font-weight: 600; margin-bottom: 0.25rem; }
+.upload-hint { font-size: 0.75rem; color: var(--text-dim); }
+.upload-status { font-size: 0.85rem; color: var(--green); margin-top: 0.75rem; display: none; }
+.upload-box.loaded .upload-status { display: block; }
+
+.upload-row {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+.upload-row .upload-box {
+  flex: 1;
+  min-width: 250px;
+  max-width: 350px;
+  margin-bottom: 0;
+}
+
+/* Comparison styles */
+.comp-badge {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+.comp-up { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.comp-down { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+.comp-new { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
+.comp-gone { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+.summary-card .comp-change {
+  font-size: 0.75rem;
+  margin-top: 0.3rem;
+}
+.summary-card .comp-change.up { color: var(--green); }
+.summary-card .comp-change.down { color: var(--red); }
+
+/* Summary cards */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.summary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.2rem;
+}
+.summary-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+}
+.summary-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+.summary-sub { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.25rem; }
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.tab {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.tab:hover { border-color: var(--accent); color: var(--text); }
+.tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+/* Charts & Tables */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.panel-title {
+  font-weight: 600;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.chart-container { height: 350px; position: relative; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+th, td {
+  padding: 0.7rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  font-weight: 600;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+td { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+tr:hover { background: var(--surface2); }
+.stress-table td, .stress-table th { padding: 0.5rem 0.6rem; font-size: 0.75rem; white-space: nowrap; }
+.num-pos { color: var(--green); }
+.num-neg { color: var(--red); }
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.badge-vol { background: rgba(99, 102, 241, 0.2); color: #818cf8; }
+.badge-eq { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.badge-cb { background: rgba(6, 182, 212, 0.2); color: #22d3ee; }
+.badge-credit { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+.badge-trading { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+.badge-other { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+
+#dashboard { display: none; }
+.hidden { display: none !important; }
+
+/* Export button */
+.export-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  margin-left: auto;
+}
+.export-btn:hover { border-color: var(--accent); }
+
+/* Filter info */
+.filter-info {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.8rem;
+  color: var(--green);
+}
+.filter-info.warning {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--amber);
+}
+#detailSearch:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+#stressIdeaSearch:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+.tab[data-view^="stress"] {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--amber);
+}
+.tab[data-view^="stress"]:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: var(--amber);
+}
+.tab[data-view^="stress"].active {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  border-color: transparent;
+  color: white;
+}
+#portfolioGroupSelect:focus, #portfolioFilterSelect:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+#portfolioGroupSelect option, #portfolioFilterSelect option {
+  background: var(--surface);
+  color: var(--text);
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>BGF Optional Theta Dashboard</h1>
+  <p class="subtitle">Analyse du coût theta optionnel par stratégie • Stress Theta -10% / -20% • Mapping intégré • AUM lu depuis le fichier</p>
+
+  <div class="upload-row">
+    <div class="upload-box" id="boxTheta">
+      <input type="file" id="fileTheta" accept=".xlsx,.xls">
+      <div class="upload-icon">📊</div>
+      <div class="upload-title">Optional Theta (Date 1)</div>
+      <div class="upload-hint">Fichier principal</div>
+      <div class="upload-status" id="statusTheta">✓ Chargé</div>
+    </div>
+    <div class="upload-box" id="boxTheta2">
+      <input type="file" id="fileTheta2" accept=".xlsx,.xls">
+      <div class="upload-icon">📈</div>
+      <div class="upload-title">Optional Theta (Date 2)</div>
+      <div class="upload-hint">Optionnel • Comparaison</div>
+      <div class="upload-status" id="statusTheta2">✓ Chargé</div>
+    </div>
+  </div>
+
+  <div id="dashboard">
+    <div class="filter-info" id="filterInfo"></div>
+
+    <div class="summary-grid" id="summaryGrid"></div>
+
+    <div class="tabs" id="tabsContainer">
+      <div class="tab active" data-view="nlStrat">NL Strategy</div>
+      <div class="tab" data-view="assetClass">Asset Class</div>
+      <div class="tab" data-view="stratBucket">Strat Bucket</div>
+      <div class="tab" data-view="mainStrat">Main Strategy</div>
+      <div class="tab" data-view="portfolio">Portfolio</div>
+      <div class="tab" data-view="stressStrategy">⚡ Stress by Strategy</div>
+      <div class="tab" data-view="stressIdeas">⚡ Stress by Idea</div>
+      <div class="tab" data-view="detail">Détail Instruments</div>
+    </div>
+
+    <div class="panel" id="chartPanel">
+      <div class="panel-title">
+        <span id="chartTitle">Répartition par NL Strategy</span>
+        <button class="export-btn" id="exportBtn">Export Excel</button>
+      </div>
+      <div class="chart-container"><canvas id="mainChart"></canvas></div>
+    </div>
+
+    <div class="panel" id="tablePanel">
+      <div class="panel-title">Breakdown</div>
+      <div style="overflow-x:auto"><table id="mainTable"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Embedded transco mapping
+const TRANSCO_MAP = {"BGLT HEDGED":{"nlStrat":"Value with Catalyst / Value","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"CB1. CREDIT":{"nlStrat":"Convertible bond arbitrage","assetClass":"Volatility","stratBucket":"Event-Driven","mainStrat":"Event driven"},"CB2. DELTA":{"nlStrat":"Convertible bond arbitrage","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"CB2. OUTRIGHT":{"nlStrat":"Convertible bond arbitrage","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"CB3. VOL":{"nlStrat":"Convertible bond arbitrage","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"CB4. EVENT":{"nlStrat":"Convertible bond arbitrage","assetClass":"Volatility","stratBucket":"Event-Driven","mainStrat":"Event driven"},"CB4. MANDATORIES":{"nlStrat":"Mandatory convertible bond arbitrage","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"CB5. ASIA":{"nlStrat":"Convertible bond arbitrage","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"CB5. PRIMARY":{"nlStrat":"Convertible bond arbitrage","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"CB6. MANDATORIES":{"nlStrat":"Mandatory convertible bond arbitrage","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"CB7. ASIA":{"nlStrat":"Convertible bond arbitrage","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"CB8.USA":{"nlStrat":"Convertible bond arbitrage","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"CB9.USA.ITM":{"nlStrat":"Convertible bond arbitrage","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"CB9BIS. CRYPTO":{"nlStrat":"Convertible bond arbitrage","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"CREDIT1. CSA":{"nlStrat":"Capital Structure Arbitrage","assetClass":"Credit","stratBucket":"Event-Driven","mainStrat":"Event driven"},"CREDIT2. L/S":{"nlStrat":"Credit Long / Short","assetClass":"Credit","stratBucket":"Event-Driven","mainStrat":"Event driven"},"CREDIT3. CASH":{"nlStrat":"Cash","assetClass":"Cash","stratBucket":"Cash","mainStrat":"Cash"},"CREDIT4. SPEC SIT":{"nlStrat":"Credit Long / Short","assetClass":"Credit","stratBucket":"Event-Driven","mainStrat":"Event driven"},"CREDIT4.TRADING":{"nlStrat":"Credit Long / Short","assetClass":"Credit","stratBucket":"Event-Driven","mainStrat":"Event driven"},"CREDIT5. DIRECT LENDING":{"nlStrat":"Direct Lending","assetClass":"Credit","stratBucket":"Direct Lending","mainStrat":"Direct Lending"},"CREDIT6. TRADING":{"nlStrat":"Credit Long / Short","assetClass":"Credit","stratBucket":"Event-Driven","mainStrat":"Event driven"},"EQ01. RISKARB":{"nlStrat":"Risk Arbitrage / Special Situations","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"EQ02. SPEC SIT":{"nlStrat":"Risk Arbitrage / Special Situations","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"EQ03. VALUE CAT":{"nlStrat":"Value with Catalyst / Value","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"EQ04. VALUE":{"nlStrat":"Value with Catalyst / Value","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"EQ05. TRADING":{"nlStrat":"Value with Catalyst / Value","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"EQ06. DIVIDENDS":{"nlStrat":"Value with Catalyst / Value","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"EQ06. PRE-EVENT":{"nlStrat":"Value with Catalyst / Value","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"EQ07. INCUBATOR":{"nlStrat":"Value with Catalyst / Value","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"EQ08.EVENT DRIVEN":{"nlStrat":"Value with Catalyst / Value","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"EQUITY":{"nlStrat":"Value with Catalyst / Value","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"EQUITY NON AUTO FX":{"nlStrat":"Value with Catalyst / Value","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"EQUITY RISK ARB":{"nlStrat":"Risk Arbitrage / Special Situations","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"FINANCIALS SPEC SIT":{"nlStrat":"Risk Arbitrage / Special Situations","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"FINANCIALS Trading":{"nlStrat":"Value with Catalyst / Value","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"GAMMA1. AYMERIC":{"nlStrat":"Gamma Trading","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"GAMMA2. ETIENNE":{"nlStrat":"Gamma Trading","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"GAMMA3. WARRANT":{"nlStrat":"Gamma Trading","assetClass":"Volatility","stratBucket":"Long Vol","mainStrat":"Protection bucket - Volatility"},"GAMMA4.VOL":{"nlStrat":"Volatility Trading","assetClass":"Volatility","stratBucket":"Overlay Vol","mainStrat":"Protection bucket - Volatility"},"GAMMA5. RATES":{"nlStrat":"Volatility Trading","assetClass":"Volatility","stratBucket":"Overlay Vol","mainStrat":"Protection bucket - Volatility"},"REINSURANCE":{"nlStrat":"Cash","assetClass":"Cash","stratBucket":"Cash","mainStrat":"Cash"},"TENDERS":{"nlStrat":"Risk Arbitrage / Special Situations","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"TRADING MACRO":{"nlStrat":"Overlay Macro","assetClass":"Trading","stratBucket":"Overlay Macro","mainStrat":"Protection bucket - Volatility"},"TRADING1":{"nlStrat":"Trading","assetClass":"Trading","stratBucket":"Event-Driven","mainStrat":"Event driven"},"TRADING1859":{"nlStrat":"Value with Catalyst / Value","assetClass":"Equity","stratBucket":"Event-Driven","mainStrat":"Event driven"},"TRADING2. EBK":{"nlStrat":"Trading","assetClass":"Trading","stratBucket":"Event-Driven","mainStrat":"Event driven"},"TRADING2. INDEX Rebal":{"nlStrat":"Index Arbitrage","assetClass":"Trading","stratBucket":"Index Arb","mainStrat":"Protection bucket - Quantitative Trading"},"TRADING3. LE":{"nlStrat":"Trading","assetClass":"Trading","stratBucket":"Event-Driven","mainStrat":"Event driven"},"TRADING4 BGEQT":{"nlStrat":"Overlay EQT","assetClass":"Trading","stratBucket":"Overlay MoM (EQT)","mainStrat":"Protection bucket - Quantitative Trading"},"TRADING4. QT":{"nlStrat":"Overlay EQT","assetClass":"Trading","stratBucket":"Overlay MoM (EQT)","mainStrat":"Protection bucket - Quantitative Trading"},"TRADING5. LQ":{"nlStrat":"Overlay CTA","assetClass":"Trading","stratBucket":"Overlay CTA","mainStrat":"Protection bucket - Quantitative Trading"},"TRADING5. QT DISCRETIONARY":{"nlStrat":"Overlay EQT","assetClass":"Trading","stratBucket":"Overlay MoM (EQT)","mainStrat":"Protection bucket - Quantitative Trading"},"TRADING5. Systematic":{"nlStrat":"Trading","assetClass":"Trading","stratBucket":"Event-Driven","mainStrat":"Event driven"},"TRADING5. Thematic":{"nlStrat":"Trading","assetClass":"Equity","stratBucket":"Overlay MoM (EQT)","mainStrat":"Protection bucket - Quantitative Trading"},"TRADING6. QT CTA":{"nlStrat":"Overlay CTA","assetClass":"Trading","stratBucket":"Overlay CTA","mainStrat":"Protection bucket - Quantitative Trading"},"Trading6.QT Equity":{"nlStrat":"Overlay EQT","assetClass":"Trading","stratBucket":"Overlay MoM (EQT)","mainStrat":"Protection bucket - Quantitative Trading"},"TRADING7. Advestis":{"nlStrat":"Trading using A.I","assetClass":"Trading","stratBucket":"Overlay AI","mainStrat":"Protection bucket - Quantitative Trading"},"TRADING7. QT. MACHINE":{"nlStrat":"Trading using A.I","assetClass":"Trading","stratBucket":"Overlay AI","mainStrat":"Protection bucket - Quantitative Trading"}};
+
+let processedData = [];
+let comparisonData = [];
+let hasComparison = false;
+let currentView = 'nlStrat';
+let mainChart = null;
+let fundAum = 0;
+let fundAum2 = 0;
+let fileName1 = '';
+let fileName2 = '';
+
+// File upload handlers
+document.getElementById('boxTheta').addEventListener('click', () => document.getElementById('fileTheta').click());
+document.getElementById('boxTheta').addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--accent)'; });
+document.getElementById('boxTheta').addEventListener('dragleave', e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; });
+document.getElementById('boxTheta').addEventListener('drop', e => {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = 'var(--border)';
+  if (e.dataTransfer.files[0]) loadThetaFile(e.dataTransfer.files[0], 1);
+});
+
+document.getElementById('fileTheta').addEventListener('change', e => {
+  if (e.target.files[0]) loadThetaFile(e.target.files[0], 1);
+});
+
+// Second file handlers
+document.getElementById('boxTheta2').addEventListener('click', () => document.getElementById('fileTheta2').click());
+document.getElementById('boxTheta2').addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--accent)'; });
+document.getElementById('boxTheta2').addEventListener('dragleave', e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border)'; });
+document.getElementById('boxTheta2').addEventListener('drop', e => {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = 'var(--border)';
+  if (e.dataTransfer.files[0]) loadThetaFile(e.dataTransfer.files[0], 2);
+});
+
+document.getElementById('fileTheta2').addEventListener('change', e => {
+  if (e.target.files[0]) loadThetaFile(e.target.files[0], 2);
+});
+
+function loadThetaFile(file, fileNum) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      
+      // Find header row (row with "Fund", "Strategy")
+      let headerRow = -1;
+      for (let i = 0; i < Math.min(10, raw.length); i++) {
+        const row = raw[i];
+        if (row && row.some(c => c && c.toString().toLowerCase().includes('fund'))) {
+          headerRow = i;
+          break;
+        }
+      }
+      
+      if (headerRow === -1) { alert('Format non reconnu'); return; }
+      
+      const headers = raw[headerRow].map(h => (h || '').toString().toLowerCase().replace(/\n/g, ' '));
+      const fundCol = headers.findIndex(h => h.includes('fund'));
+      const stratCol = headers.findIndex(h => h.includes('strategy'));
+      const portfolioCol = headers.findIndex(h => h.includes('portfolio'));
+      const instrumentCol = headers.findIndex(h => h.includes('instrument'));
+      const thetaCol = headers.findIndex(h => h.includes('optional theta') && h.includes('next day') && !h.includes('10') && !h.includes('20'));
+      const theta10Col = headers.findIndex(h => h.includes('optional theta') && h.includes('10%'));
+      const theta20Col = headers.findIndex(h => h.includes('optional theta') && h.includes('20%'));
+      const aumCol = 11; // Column L (0-indexed = 11)
+      
+      let thetaData = [];
+      let detectedAum = 0;
+      
+      for (let i = headerRow + 1; i < raw.length; i++) {
+        const row = raw[i];
+        if (!row || !row[fundCol]) continue;
+        const fund = row[fundCol].toString();
+        if (!fund.includes('BGF')) continue;
+        
+        const strat = (row[stratCol] || '').toString().trim();
+        // FILTER OUT Z and ZZ prefixed strategies
+        if (strat.startsWith('ZZ ') || strat.startsWith('Z ') || strat === 'ZZ' || strat === 'Z') continue;
+        
+        // Get AUM from column L
+        const rowAum = parseFloat(row[aumCol]) || 0;
+        if (rowAum > 0 && detectedAum === 0) detectedAum = rowAum;
+        
+        thetaData.push({
+          fund: fund,
+          strategy: strat,
+          portfolio: (row[portfolioCol] || '').toString(),
+          instrument: (row[instrumentCol] || '').toString(),
+          theta1d: parseFloat(row[thetaCol]) || 0,
+          theta10_1d: theta10Col >= 0 ? (parseFloat(row[theta10Col]) || 0) : 0,
+          theta20_1d: theta20Col >= 0 ? (parseFloat(row[theta20Col]) || 0) : 0
+        });
+      }
+      
+      // Apply mapping
+      const mappedData = thetaData.map(row => {
+        const mapping = TRANSCO_MAP[row.strategy] || {};
+        const theta30d = row.theta1d * 30;
+        const thetaBps = detectedAum > 0 ? (theta30d / detectedAum) * 10000 : 0;
+        const theta10_30d = row.theta10_1d * 30;
+        const theta10_bps = detectedAum > 0 ? (theta10_30d / detectedAum) * 10000 : 0;
+        const theta20_30d = row.theta20_1d * 30;
+        const theta20_bps = detectedAum > 0 ? (theta20_30d / detectedAum) * 10000 : 0;
+        
+        return {
+          ...row,
+          nlStrat: mapping.nlStrat || row.strategy || 'N/A',
+          assetClass: mapping.assetClass || 'Non mappé',
+          stratBucket: mapping.stratBucket || 'Non mappé',
+          mainStrat: mapping.mainStrat || 'Non mappé',
+          theta30d,
+          thetaBps,
+          theta10_30d,
+          theta10_bps,
+          theta20_30d,
+          theta20_bps
+        };
+      });
+      
+      if (fileNum === 1) {
+        processedData = mappedData;
+        fundAum = detectedAum;
+        fileName1 = file.name;
+        document.getElementById('boxTheta').classList.add('loaded');
+        document.getElementById('statusTheta').textContent = `✓ ${mappedData.length} lignes • ${formatEur(detectedAum)}`;
+      } else {
+        comparisonData = mappedData;
+        fundAum2 = detectedAum;
+        fileName2 = file.name;
+        hasComparison = true;
+        document.getElementById('boxTheta2').classList.add('loaded');
+        document.getElementById('statusTheta2').textContent = `✓ ${mappedData.length} lignes • ${formatEur(detectedAum)}`;
+      }
+      
+      if (processedData.length > 0) {
+        analyze();
+      }
+    } catch (err) {
+      alert('Erreur lecture: ' + err.message);
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function analyze() {
+  // Process data with mapping
+  let unmappedStrats = new Set();
+  processedData.forEach(row => {
+    if (!TRANSCO_MAP[row.strategy] && row.strategy) unmappedStrats.add(row.strategy);
+  });
+  
+  // Update filter info
+  const filterEl = document.getElementById('filterInfo');
+  let infoHtml = '';
+  if (unmappedStrats.size > 0) {
+    filterEl.className = 'filter-info warning';
+    infoHtml = `<strong>⚠ ${unmappedStrats.size} stratégies non mappées:</strong> ${[...unmappedStrats].join(', ')}`;
+  } else {
+    filterEl.className = 'filter-info';
+    infoHtml = `<strong>✓ Toutes les stratégies mappées</strong> • ${processedData.length} lignes`;
+  }
+  if (hasComparison) {
+    infoHtml += ` • <strong style="color:var(--cyan)">Mode comparaison actif</strong> (${fileName1} vs ${fileName2})`;
+  }
+  filterEl.innerHTML = infoHtml;
+  
+  // Show dashboard
+  document.getElementById('dashboard').style.display = 'block';
+  
+  // Calculate summaries
+  const totalTheta1d = processedData.reduce((s, r) => s + r.theta1d, 0);
+  const totalTheta30d = totalTheta1d * 30;
+  const totalBps = fundAum > 0 ? (totalTheta30d / fundAum) * 10000 : 0;
+  
+  const totalTheta10_1d = processedData.reduce((s, r) => s + r.theta10_1d, 0);
+  const totalTheta10_30d = totalTheta10_1d * 30;
+  const totalBps10 = fundAum > 0 ? (totalTheta10_30d / fundAum) * 10000 : 0;
+  
+  const totalTheta20_1d = processedData.reduce((s, r) => s + r.theta20_1d, 0);
+  const totalTheta20_30d = totalTheta20_1d * 30;
+  const totalBps20 = fundAum > 0 ? (totalTheta20_30d / fundAum) * 10000 : 0;
+  
+  // Comparison values
+  let compTheta1d = 0, compTheta30d = 0, compBps = 0;
+  if (hasComparison) {
+    compTheta1d = comparisonData.reduce((s, r) => s + r.theta1d, 0);
+    compTheta30d = compTheta1d * 30;
+    compBps = fundAum2 > 0 ? (compTheta30d / fundAum2) * 10000 : 0;
+  }
+  
+  function compHtml(val1, val2, isEur = false) {
+    if (!hasComparison) return '';
+    const diff = val1 - val2;
+    const cls = diff > 0 ? 'up' : diff < 0 ? 'down' : '';
+    const sign = diff > 0 ? '+' : '';
+    if (isEur) {
+      return `<div class="comp-change ${cls}">${sign}${formatEur(diff)} vs D2</div>`;
+    }
+    return `<div class="comp-change ${cls}">${sign}${diff.toFixed(1)} bps vs D2</div>`;
+  }
+  
+  document.getElementById('summaryGrid').innerHTML = `
+    <div class="summary-card">
+      <div class="summary-label">AUM BGF</div>
+      <div class="summary-value">${formatEur(fundAum)}</div>
+      ${hasComparison ? `<div class="summary-sub" style="color:var(--text-dim)">Date 2: ${formatEur(fundAum2)}</div>` : '<div class="summary-sub">lu depuis le fichier</div>'}
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Theta 1 Jour</div>
+      <div class="summary-value ${totalTheta1d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(totalTheta1d)}</div>
+      ${compHtml(totalTheta1d, compTheta1d, true)}
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Theta 30 Jours</div>
+      <div class="summary-value ${totalTheta30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(totalTheta30d)}</div>
+      ${compHtml(totalTheta30d, compTheta30d, true)}
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Impact Mensuel</div>
+      <div class="summary-value ${totalBps < 0 ? 'num-neg' : 'num-pos'}">${totalBps.toFixed(1)} bps</div>
+      ${compHtml(totalBps, compBps, false)}
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Positions</div>
+      <div class="summary-value">${processedData.length}</div>
+      ${hasComparison ? `<div class="summary-sub" style="color:var(--text-dim)">Date 2: ${comparisonData.length}</div>` : `<div class="summary-sub">${new Set(processedData.map(r => r.strategy)).size} stratégies</div>`}
+    </div>
+    <div class="summary-card" style="border-color:rgba(245,158,11,0.3)">
+      <div class="summary-label" style="color:var(--amber)">⚡ Theta 30D @ -10%</div>
+      <div class="summary-value ${totalTheta10_30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(totalTheta10_30d)}</div>
+      <div class="summary-sub" style="color:var(--amber)">${totalBps10.toFixed(1)} bps • Δ ${formatEur(totalTheta10_30d - totalTheta30d)} vs base</div>
+    </div>
+    <div class="summary-card" style="border-color:rgba(239,68,68,0.3)">
+      <div class="summary-label" style="color:var(--red)">⚡ Theta 30D @ -20%</div>
+      <div class="summary-value ${totalTheta20_30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(totalTheta20_30d)}</div>
+      <div class="summary-sub" style="color:var(--red)">${totalBps20.toFixed(1)} bps • Δ ${formatEur(totalTheta20_30d - totalTheta30d)} vs base</div>
+    </div>
+  `;
+  
+  renderView(currentView);
+}
+
+// Tab handling
+document.getElementById('tabsContainer').addEventListener('click', e => {
+  if (e.target.classList.contains('tab')) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    e.target.classList.add('active');
+    currentView = e.target.dataset.view;
+    renderView(currentView);
+  }
+});
+
+let portfolioGroupBy = 'none';
+
+function renderView(view) {
+  const titles = {
+    nlStrat: 'NL Strategy',
+    assetClass: 'Asset Class',
+    stratBucket: 'Strat Bucket',
+    mainStrat: 'Main Strategy',
+    portfolio: 'Portfolio',
+    stressStrategy: 'Stress Theta by Strategy (-10% / -20%)',
+    stressIdeas: 'Stress Theta by Idea (-10% / -20%)',
+    detail: 'Détail par Instrument'
+  };
+  document.getElementById('chartTitle').textContent = 'Répartition par ' + titles[view];
+  
+  // Remove search container when not in detail/stressIdeas view
+  const searchContainer = document.getElementById('searchContainer');
+  if (searchContainer && view !== 'detail' && view !== 'stressIdeas') {
+    searchContainer.remove();
+    detailSearchTerm = '';
+  }
+  
+  // Remove stress search container when switching views
+  const stressSearchContainer = document.getElementById('stressSearchContainer');
+  if (stressSearchContainer && view !== 'stressIdeas') {
+    stressSearchContainer.remove();
+  }
+  
+  // Remove portfolio filters when not in portfolio view
+  const portfolioFilters = document.getElementById('portfolioFilters');
+  if (portfolioFilters && view !== 'portfolio') {
+    portfolioFilters.remove();
+  }
+  
+  // Remove stress filters when not in stress views
+  const stressFilters = document.getElementById('stressFilters');
+  if (stressFilters && view !== 'stressStrategy' && view !== 'stressIdeas') {
+    stressFilters.remove();
+  }
+  
+  if (view === 'detail') {
+    renderDetailTable();
+    document.getElementById('chartPanel').classList.add('hidden');
+  } else if (view === 'portfolio') {
+    document.getElementById('chartPanel').classList.remove('hidden');
+    renderPortfolioView();
+  } else if (view === 'stressStrategy') {
+    document.getElementById('chartPanel').classList.remove('hidden');
+    renderStressStrategyView();
+  } else if (view === 'stressIdeas') {
+    document.getElementById('chartPanel').classList.remove('hidden');
+    renderStressIdeasView();
+  } else {
+    document.getElementById('chartPanel').classList.remove('hidden');
+    renderAggregatedView(view);
+  }
+}
+
+function renderAggregatedView(groupKey) {
+  const agg = {};
+  processedData.forEach(row => {
+    const key = row[groupKey] || 'N/A';
+    if (!agg[key]) agg[key] = { theta1d: 0, theta30d: 0, thetaBps: 0, count: 0 };
+    agg[key].theta1d += row.theta1d;
+    agg[key].theta30d += row.theta30d;
+    agg[key].thetaBps += row.thetaBps;
+    agg[key].count++;
+  });
+  
+  // Comparison aggregation
+  const agg2 = {};
+  if (hasComparison) {
+    comparisonData.forEach(row => {
+      const key = row[groupKey] || 'N/A';
+      if (!agg2[key]) agg2[key] = { theta1d: 0, theta30d: 0, thetaBps: 0, count: 0 };
+      agg2[key].theta1d += row.theta1d;
+      agg2[key].theta30d += row.theta30d;
+      agg2[key].thetaBps += row.thetaBps;
+      agg2[key].count++;
+    });
+  }
+  
+  const sorted = Object.entries(agg).sort((a, b) => a[1].theta1d - b[1].theta1d);
+  
+  // Chart
+  const labels = sorted.map(([k]) => k);
+  const values = sorted.map(([, v]) => v.theta30d);
+  
+  const datasets = [{
+    label: 'Date 1',
+    data: values,
+    backgroundColor: values.map(v => v < 0 ? 'rgba(239, 68, 68, 0.7)' : 'rgba(16, 185, 129, 0.7)'),
+    borderColor: values.map(v => v < 0 ? '#ef4444' : '#10b981'),
+    borderWidth: 1
+  }];
+  
+  if (hasComparison) {
+    const values2 = sorted.map(([k]) => agg2[k]?.theta30d || 0);
+    datasets.push({
+      label: 'Date 2',
+      data: values2,
+      backgroundColor: 'rgba(99, 102, 241, 0.4)',
+      borderColor: '#6366f1',
+      borderWidth: 1
+    });
+  }
+  
+  if (mainChart) mainChart.destroy();
+  mainChart = new Chart(document.getElementById('mainChart'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: hasComparison, labels: { color: '#94a3b8' } },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${formatEur(ctx.raw)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#2d3748' },
+          ticks: { color: '#94a3b8', callback: v => formatCompact(v) }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: '#f1f5f9', font: { size: 11 } }
+        }
+      }
+    }
+  });
+  
+  // Table
+  const thead = document.querySelector('#mainTable thead');
+  const tbody = document.querySelector('#mainTable tbody');
+  
+  if (hasComparison) {
+    thead.innerHTML = `<tr><th>${groupKey.replace(/([A-Z])/g, ' $1').trim()}</th><th>Pos</th><th>Theta 30D (D1)</th><th>Theta 30D (D2)</th><th>Δ Change</th><th>Impact (bps)</th></tr>`;
+  } else {
+    thead.innerHTML = `<tr><th>${groupKey.replace(/([A-Z])/g, ' $1').trim()}</th><th>Positions</th><th>Theta 1D</th><th>Theta 30D</th><th>Impact (bps)</th><th>% Total</th></tr>`;
+  }
+  
+  const total30d = processedData.reduce((s, r) => s + r.theta30d, 0);
+  tbody.innerHTML = sorted.map(([key, v]) => {
+    const v2 = agg2[key] || { theta1d: 0, theta30d: 0, thetaBps: 0, count: 0 };
+    const diff = v.theta30d - v2.theta30d;
+    
+    if (hasComparison) {
+      let changeBadge = '';
+      if (!agg2[key]) {
+        changeBadge = '<span class="comp-badge comp-new">NEW</span>';
+      } else if (Math.abs(diff) > 100) {
+        changeBadge = `<span class="comp-badge ${diff < 0 ? 'comp-down' : 'comp-up'}">${diff < 0 ? '' : '+'}${formatEur(diff)}</span>`;
+      }
+      
+      return `<tr>
+        <td>${key}</td>
+        <td>${v.count}</td>
+        <td class="${v.theta30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(v.theta30d)}</td>
+        <td class="${v2.theta30d < 0 ? 'num-neg' : 'num-pos'}" style="opacity:0.7">${formatEur(v2.theta30d)}</td>
+        <td>${changeBadge}</td>
+        <td class="${v.thetaBps < 0 ? 'num-neg' : 'num-pos'}">${v.thetaBps.toFixed(2)}</td>
+      </tr>`;
+    } else {
+      const pct = total30d !== 0 ? (v.theta30d / total30d * 100) : 0;
+      return `<tr>
+        <td>${key}</td>
+        <td>${v.count}</td>
+        <td class="${v.theta1d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(v.theta1d)}</td>
+        <td class="${v.theta30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(v.theta30d)}</td>
+        <td class="${v.thetaBps < 0 ? 'num-neg' : 'num-pos'}">${v.thetaBps.toFixed(2)}</td>
+        <td>${pct.toFixed(1)}%</td>
+      </tr>`;
+    }
+  }).join('');
+}
+
+function renderPortfolioView() {
+  // Add filter controls if not present
+  let filtersEl = document.getElementById('portfolioFilters');
+  if (!filtersEl) {
+    filtersEl = document.createElement('div');
+    filtersEl.id = 'portfolioFilters';
+    filtersEl.style.cssText = 'display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;';
+    filtersEl.innerHTML = `
+      <label style="font-size:0.85rem;color:var(--text-dim);">Regrouper par:</label>
+      <select id="portfolioGroupSelect" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:0.5rem 1rem;border-radius:8px;font-size:0.85rem;cursor:pointer;">
+        <option value="none">Aucun (tous les portfolios)</option>
+        <option value="assetClass">Asset Class</option>
+        <option value="nlStrat">NL Strategy</option>
+        <option value="stratBucket">Strat Bucket</option>
+        <option value="mainStrat">Main Strategy</option>
+        <option value="strategy">Strategy Mysis</option>
+      </select>
+      <label style="font-size:0.85rem;color:var(--text-dim);margin-left:1rem;">Filtrer:</label>
+      <select id="portfolioFilterSelect" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:0.5rem 1rem;border-radius:8px;font-size:0.85rem;cursor:pointer;min-width:180px;">
+        <option value="">Tous</option>
+      </select>
+    `;
+    document.getElementById('tablePanel').querySelector('.panel-title').after(filtersEl);
+    
+    document.getElementById('portfolioGroupSelect').addEventListener('change', (e) => {
+      portfolioGroupBy = e.target.value;
+      updatePortfolioFilterOptions();
+      renderPortfolioData();
+    });
+    
+    document.getElementById('portfolioFilterSelect').addEventListener('change', () => {
+      renderPortfolioData();
+    });
+  }
+  
+  updatePortfolioFilterOptions();
+  renderPortfolioData();
+}
+
+function updatePortfolioFilterOptions() {
+  const filterSelect = document.getElementById('portfolioFilterSelect');
+  const groupBy = portfolioGroupBy;
+  
+  filterSelect.innerHTML = '<option value="">Tous</option>';
+  
+  if (groupBy !== 'none') {
+    const values = new Set();
+    processedData.forEach(r => {
+      const val = r[groupBy];
+      if (val) values.add(val);
+    });
+    [...values].sort().forEach(v => {
+      filterSelect.innerHTML += `<option value="${v}">${v}</option>`;
+    });
+  }
+}
+
+function renderPortfolioData() {
+  const groupBy = portfolioGroupBy;
+  const filterVal = document.getElementById('portfolioFilterSelect')?.value || '';
+  
+  // Filter data
+  let data = processedData;
+  if (filterVal && groupBy !== 'none') {
+    data = data.filter(r => r[groupBy] === filterVal);
+  }
+  
+  // Aggregate by portfolio
+  const agg = {};
+  data.forEach(row => {
+    const key = row.portfolio || 'N/A';
+    if (!agg[key]) {
+      agg[key] = { 
+        theta1d: 0, theta30d: 0, thetaBps: 0, count: 0,
+        strategies: new Set(),
+        assetClasses: new Set(),
+        nlStrats: new Set()
+      };
+    }
+    agg[key].theta1d += row.theta1d;
+    agg[key].theta30d += row.theta30d;
+    agg[key].thetaBps += row.thetaBps;
+    agg[key].count++;
+    agg[key].strategies.add(row.strategy);
+    agg[key].assetClasses.add(row.assetClass);
+    agg[key].nlStrats.add(row.nlStrat);
+  });
+  
+  const sorted = Object.entries(agg).sort((a, b) => a[1].theta1d - b[1].theta1d);
+  
+  // Update chart title
+  let title = 'Répartition par Portfolio';
+  if (filterVal) title += ` (${filterVal})`;
+  document.getElementById('chartTitle').textContent = title;
+  
+  // Chart - limit to top/bottom 15 if too many
+  const chartData = sorted.length > 30 ? [...sorted.slice(0, 15), ...sorted.slice(-15)] : sorted;
+  const labels = chartData.map(([k]) => k.length > 25 ? k.slice(0, 22) + '...' : k);
+  const values = chartData.map(([, v]) => v.theta30d);
+  
+  if (mainChart) mainChart.destroy();
+  mainChart = new Chart(document.getElementById('mainChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: values.map(v => v < 0 ? 'rgba(239, 68, 68, 0.7)' : 'rgba(16, 185, 129, 0.7)'),
+        borderColor: values.map(v => v < 0 ? '#ef4444' : '#10b981'),
+        borderWidth: 1
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${formatEur(ctx.raw)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#2d3748' },
+          ticks: { color: '#94a3b8', callback: v => formatCompact(v) }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: '#f1f5f9', font: { size: 10 } }
+        }
+      }
+    }
+  });
+  
+  // Table
+  const thead = document.querySelector('#mainTable thead');
+  const tbody = document.querySelector('#mainTable tbody');
+  
+  thead.innerHTML = `<tr><th>Portfolio</th><th>Instruments</th><th>Strategies</th><th>Asset Classes</th><th>Theta 1D</th><th>Theta 30D</th><th>Impact (bps)</th><th>% Total</th></tr>`;
+  
+  const total30d = data.reduce((s, r) => s + r.theta30d, 0);
+  tbody.innerHTML = sorted.map(([key, v]) => {
+    const pct = total30d !== 0 ? (v.theta30d / total30d * 100) : 0;
+    const acBadges = [...v.assetClasses].slice(0, 2).map(ac => `<span class="badge ${getBadgeClass(ac)}" style="margin-right:3px">${ac}</span>`).join('');
+    return `<tr>
+      <td title="${key}">${key.length > 30 ? key.slice(0, 27) + '...' : key}</td>
+      <td>${v.count}</td>
+      <td>${v.strategies.size}</td>
+      <td>${acBadges}${v.assetClasses.size > 2 ? `<span style="color:var(--text-dim);font-size:0.7rem">+${v.assetClasses.size - 2}</span>` : ''}</td>
+      <td class="${v.theta1d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(v.theta1d)}</td>
+      <td class="${v.theta30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(v.theta30d)}</td>
+      <td class="${v.thetaBps < 0 ? 'num-neg' : 'num-pos'}">${v.thetaBps.toFixed(2)}</td>
+      <td>${pct.toFixed(1)}%</td>
+    </tr>`;
+  }).join('');
+  
+  if (sorted.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-dim)">Aucun résultat</td></tr>`;
+  }
+}
+
+// ==================== STRESS THETA VIEWS ====================
+
+let stressGroupBy = 'strategy';
+
+function renderStressStrategyView() {
+  // Add groupBy filter
+  let filtersEl = document.getElementById('stressFilters');
+  if (!filtersEl) {
+    filtersEl = document.createElement('div');
+    filtersEl.id = 'stressFilters';
+    filtersEl.style.cssText = 'display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;';
+    filtersEl.innerHTML = `
+      <label style="font-size:0.85rem;color:var(--text-dim);">Agréger par:</label>
+      <select id="stressGroupSelect" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:0.5rem 1rem;border-radius:8px;font-size:0.85rem;cursor:pointer;">
+        <option value="strategy">Strategy Mysis</option>
+        <option value="nlStrat">NL Strategy</option>
+        <option value="assetClass">Asset Class</option>
+        <option value="stratBucket">Strat Bucket</option>
+        <option value="mainStrat">Main Strategy</option>
+      </select>
+    `;
+    document.getElementById('tablePanel').querySelector('.panel-title').after(filtersEl);
+    
+    document.getElementById('stressGroupSelect').addEventListener('change', (e) => {
+      stressGroupBy = e.target.value;
+      renderStressStrategyData();
+    });
+  }
+  
+  renderStressStrategyData();
+}
+
+function renderStressStrategyData() {
+  const groupKey = stressGroupBy;
+  
+  // Aggregate
+  const agg = {};
+  processedData.forEach(row => {
+    const key = row[groupKey] || 'N/A';
+    if (!agg[key]) agg[key] = { theta1d: 0, theta30d: 0, thetaBps: 0, theta10_1d: 0, theta10_30d: 0, theta10_bps: 0, theta20_1d: 0, theta20_30d: 0, theta20_bps: 0, count: 0 };
+    agg[key].theta1d += row.theta1d;
+    agg[key].theta30d += row.theta30d;
+    agg[key].thetaBps += row.thetaBps;
+    agg[key].theta10_1d += row.theta10_1d;
+    agg[key].theta10_30d += row.theta10_30d;
+    agg[key].theta10_bps += row.theta10_bps;
+    agg[key].theta20_1d += row.theta20_1d;
+    agg[key].theta20_30d += row.theta20_30d;
+    agg[key].theta20_bps += row.theta20_bps;
+    agg[key].count++;
+  });
+  
+  const sorted = Object.entries(agg).sort((a, b) => a[1].theta10_30d - b[1].theta10_30d);
+  
+  // Chart — grouped bar: Base vs -10% vs -20% (30D)
+  const chartData = sorted.length > 25 ? [...sorted.slice(0, 12), ...sorted.slice(-12)] : sorted;
+  const labels = chartData.map(([k]) => k.length > 28 ? k.slice(0, 25) + '...' : k);
+  
+  if (mainChart) mainChart.destroy();
+  mainChart = new Chart(document.getElementById('mainChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Base Theta 30D',
+          data: chartData.map(([, v]) => v.theta30d),
+          backgroundColor: 'rgba(99, 102, 241, 0.6)',
+          borderColor: '#6366f1',
+          borderWidth: 1
+        },
+        {
+          label: 'Theta -10% 30D',
+          data: chartData.map(([, v]) => v.theta10_30d),
+          backgroundColor: 'rgba(245, 158, 11, 0.6)',
+          borderColor: '#f59e0b',
+          borderWidth: 1
+        },
+        {
+          label: 'Theta -20% 30D',
+          data: chartData.map(([, v]) => v.theta20_30d),
+          backgroundColor: 'rgba(239, 68, 68, 0.6)',
+          borderColor: '#ef4444',
+          borderWidth: 1
+        }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, labels: { color: '#94a3b8', font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${formatEur(ctx.raw)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#2d3748' },
+          ticks: { color: '#94a3b8', callback: v => formatCompact(v) }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: '#f1f5f9', font: { size: 10 } }
+        }
+      }
+    }
+  });
+  
+  // Table
+  const thead = document.querySelector('#mainTable thead');
+  const tbody = document.querySelector('#mainTable tbody');
+  
+  thead.innerHTML = `<tr>
+    <th>${groupKey === 'strategy' ? 'Strategy' : groupKey.replace(/([A-Z])/g, ' $1').trim()}</th>
+    <th>Pos</th>
+    <th>Base 1D</th>
+    <th>Base 30D</th>
+    <th>Base bps</th>
+    <th style="border-left:2px solid var(--amber)">-10% 1D</th>
+    <th>-10% 30D</th>
+    <th>-10% bps</th>
+    <th>Δ vs Base</th>
+    <th style="border-left:2px solid var(--red)">-20% 1D</th>
+    <th>-20% 30D</th>
+    <th>-20% bps</th>
+    <th>Δ vs Base</th>
+  </tr>`;
+  
+  tbody.innerHTML = sorted.map(([key, v]) => {
+    const diff10 = v.theta10_30d - v.theta30d;
+    const diff20 = v.theta20_30d - v.theta30d;
+    const diff10pct = v.theta30d !== 0 ? ((diff10 / Math.abs(v.theta30d)) * 100) : 0;
+    const diff20pct = v.theta30d !== 0 ? ((diff20 / Math.abs(v.theta30d)) * 100) : 0;
+    
+    return `<tr>
+      <td title="${key}">${key.length > 30 ? key.slice(0, 27) + '...' : key}</td>
+      <td>${v.count}</td>
+      <td class="${v.theta1d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(v.theta1d)}</td>
+      <td class="${v.theta30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(v.theta30d)}</td>
+      <td class="${v.thetaBps < 0 ? 'num-neg' : 'num-pos'}">${v.thetaBps.toFixed(2)}</td>
+      <td style="border-left:2px solid rgba(245,158,11,0.3)" class="${v.theta10_1d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(v.theta10_1d)}</td>
+      <td class="${v.theta10_30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(v.theta10_30d)}</td>
+      <td class="${v.theta10_bps < 0 ? 'num-neg' : 'num-pos'}">${v.theta10_bps.toFixed(2)}</td>
+      <td class="${diff10 < 0 ? 'num-neg' : diff10 > 0 ? 'num-pos' : ''}">${diff10 >= 0 ? '+' : ''}${formatEur(diff10)} <span style="font-size:0.65rem;opacity:0.7">${diff10pct >= 0 ? '+' : ''}${diff10pct.toFixed(0)}%</span></td>
+      <td style="border-left:2px solid rgba(239,68,68,0.3)" class="${v.theta20_1d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(v.theta20_1d)}</td>
+      <td class="${v.theta20_30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(v.theta20_30d)}</td>
+      <td class="${v.theta20_bps < 0 ? 'num-neg' : 'num-pos'}">${v.theta20_bps.toFixed(2)}</td>
+      <td class="${diff20 < 0 ? 'num-neg' : diff20 > 0 ? 'num-pos' : ''}">${diff20 >= 0 ? '+' : ''}${formatEur(diff20)} <span style="font-size:0.65rem;opacity:0.7">${diff20pct >= 0 ? '+' : ''}${diff20pct.toFixed(0)}%</span></td>
+    </tr>`;
+  }).join('');
+  
+  // Totals row
+  const totals = sorted.reduce((acc, [, v]) => {
+    acc.theta1d += v.theta1d; acc.theta30d += v.theta30d; acc.thetaBps += v.thetaBps;
+    acc.theta10_1d += v.theta10_1d; acc.theta10_30d += v.theta10_30d; acc.theta10_bps += v.theta10_bps;
+    acc.theta20_1d += v.theta20_1d; acc.theta20_30d += v.theta20_30d; acc.theta20_bps += v.theta20_bps;
+    acc.count += v.count;
+    return acc;
+  }, { theta1d:0, theta30d:0, thetaBps:0, theta10_1d:0, theta10_30d:0, theta10_bps:0, theta20_1d:0, theta20_30d:0, theta20_bps:0, count:0 });
+  
+  const tDiff10 = totals.theta10_30d - totals.theta30d;
+  const tDiff20 = totals.theta20_30d - totals.theta30d;
+  const tDiff10pct = totals.theta30d !== 0 ? ((tDiff10 / Math.abs(totals.theta30d)) * 100) : 0;
+  const tDiff20pct = totals.theta30d !== 0 ? ((tDiff20 / Math.abs(totals.theta30d)) * 100) : 0;
+  
+  tbody.innerHTML += `<tr style="border-top:2px solid var(--accent);font-weight:700;background:var(--surface2)">
+    <td>TOTAL</td>
+    <td>${totals.count}</td>
+    <td class="${totals.theta1d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(totals.theta1d)}</td>
+    <td class="${totals.theta30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(totals.theta30d)}</td>
+    <td class="${totals.thetaBps < 0 ? 'num-neg' : 'num-pos'}">${totals.thetaBps.toFixed(2)}</td>
+    <td style="border-left:2px solid rgba(245,158,11,0.3)" class="${totals.theta10_1d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(totals.theta10_1d)}</td>
+    <td class="${totals.theta10_30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(totals.theta10_30d)}</td>
+    <td class="${totals.theta10_bps < 0 ? 'num-neg' : 'num-pos'}">${totals.theta10_bps.toFixed(2)}</td>
+    <td class="${tDiff10 < 0 ? 'num-neg' : tDiff10 > 0 ? 'num-pos' : ''}">${tDiff10 >= 0 ? '+' : ''}${formatEur(tDiff10)} <span style="font-size:0.65rem;opacity:0.7">${tDiff10pct >= 0 ? '+' : ''}${tDiff10pct.toFixed(0)}%</span></td>
+    <td style="border-left:2px solid rgba(239,68,68,0.3)" class="${totals.theta20_1d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(totals.theta20_1d)}</td>
+    <td class="${totals.theta20_30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(totals.theta20_30d)}</td>
+    <td class="${totals.theta20_bps < 0 ? 'num-neg' : 'num-pos'}">${totals.theta20_bps.toFixed(2)}</td>
+    <td class="${tDiff20 < 0 ? 'num-neg' : tDiff20 > 0 ? 'num-pos' : ''}">${tDiff20 >= 0 ? '+' : ''}${formatEur(tDiff20)} <span style="font-size:0.65rem;opacity:0.7">${tDiff20pct >= 0 ? '+' : ''}${tDiff20pct.toFixed(0)}%</span></td>
+  </tr>`;
+}
+
+let stressIdeaSearchTerm = '';
+
+function renderStressIdeasView() {
+  // Hide chart for ideas view (too many items)
+  document.getElementById('chartPanel').classList.add('hidden');
+  
+  const thead = document.querySelector('#mainTable thead');
+  const tbody = document.querySelector('#mainTable tbody');
+  
+  // Add search bar if not present
+  let searchEl = document.getElementById('stressSearchContainer');
+  if (!searchEl) {
+    searchEl = document.createElement('div');
+    searchEl.id = 'stressSearchContainer';
+    searchEl.style.cssText = 'margin-bottom:1rem;position:relative;';
+    searchEl.innerHTML = `
+      <input type="text" id="stressIdeaSearch" placeholder="Rechercher portfolio, instrument, stratégie, underlying..." 
+        style="width:100%;max-width:500px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:0.7rem 1rem;border-radius:8px;font-size:0.85rem;outline:none;">
+    `;
+    document.getElementById('tablePanel').querySelector('.panel-title').after(searchEl);
+    
+    document.getElementById('stressIdeaSearch').addEventListener('input', (e) => {
+      stressIdeaSearchTerm = e.target.value.toLowerCase();
+      renderStressIdeasRows();
+    });
+    
+    document.getElementById('stressIdeaSearch').addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.target.value = '';
+        stressIdeaSearchTerm = '';
+        renderStressIdeasRows();
+      }
+    });
+  }
+  
+  thead.innerHTML = `<tr>
+    <th>Strategy</th>
+    <th>Portfolio / Idea</th>
+    <th>Instrument</th>
+    <th>Base 1D</th>
+    <th>Base 30D</th>
+    <th>Base bps</th>
+    <th style="border-left:2px solid var(--amber)">-10% 1D</th>
+    <th>-10% 30D</th>
+    <th>-10% bps</th>
+    <th>Δ vs Base</th>
+    <th style="border-left:2px solid var(--red)">-20% 1D</th>
+    <th>-20% 30D</th>
+    <th>-20% bps</th>
+    <th>Δ vs Base</th>
+  </tr>`;
+  
+  renderStressIdeasRows();
+}
+
+function renderStressIdeasRows() {
+  const tbody = document.querySelector('#mainTable tbody');
+  
+  // Filter to only rows that have non-zero stress theta
+  let filtered = processedData.filter(r => r.theta10_1d !== 0 || r.theta20_1d !== 0 || r.theta1d !== 0);
+  
+  if (stressIdeaSearchTerm) {
+    filtered = filtered.filter(r => 
+      r.instrument.toLowerCase().includes(stressIdeaSearchTerm) ||
+      r.portfolio.toLowerCase().includes(stressIdeaSearchTerm) ||
+      r.strategy.toLowerCase().includes(stressIdeaSearchTerm) ||
+      (r.nlStrat && r.nlStrat.toLowerCase().includes(stressIdeaSearchTerm))
+    );
+  }
+  
+  // Sort by theta10_1d (most negative first)
+  const sorted = filtered.sort((a, b) => a.theta10_1d - b.theta10_1d);
+  
+  tbody.innerHTML = sorted.slice(0, 150).map(row => {
+    const diff10 = row.theta10_30d - row.theta30d;
+    const diff20 = row.theta20_30d - row.theta30d;
+    const diff10pct = row.theta30d !== 0 ? ((diff10 / Math.abs(row.theta30d)) * 100) : 0;
+    const diff20pct = row.theta30d !== 0 ? ((diff20 / Math.abs(row.theta30d)) * 100) : 0;
+    const badge = getBadgeClass(row.assetClass);
+    
+    return `<tr>
+      <td><span class="badge ${badge}" style="font-size:0.6rem">${row.strategy}</span></td>
+      <td title="${row.portfolio}" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${row.portfolio}</td>
+      <td title="${row.instrument}" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${row.instrument}</td>
+      <td class="${row.theta1d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(row.theta1d)}</td>
+      <td class="${row.theta30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(row.theta30d)}</td>
+      <td class="${row.thetaBps < 0 ? 'num-neg' : 'num-pos'}">${row.thetaBps.toFixed(3)}</td>
+      <td style="border-left:2px solid rgba(245,158,11,0.3)" class="${row.theta10_1d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(row.theta10_1d)}</td>
+      <td class="${row.theta10_30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(row.theta10_30d)}</td>
+      <td class="${row.theta10_bps < 0 ? 'num-neg' : 'num-pos'}">${row.theta10_bps.toFixed(3)}</td>
+      <td class="${diff10 < 0 ? 'num-neg' : diff10 > 0 ? 'num-pos' : ''}" style="font-size:0.7rem">${diff10 >= 0 ? '+' : ''}${formatEur(diff10)}</td>
+      <td style="border-left:2px solid rgba(239,68,68,0.3)" class="${row.theta20_1d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(row.theta20_1d)}</td>
+      <td class="${row.theta20_30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(row.theta20_30d)}</td>
+      <td class="${row.theta20_bps < 0 ? 'num-neg' : 'num-pos'}">${row.theta20_bps.toFixed(3)}</td>
+      <td class="${diff20 < 0 ? 'num-neg' : diff20 > 0 ? 'num-pos' : ''}" style="font-size:0.7rem">${diff20 >= 0 ? '+' : ''}${formatEur(diff20)}</td>
+    </tr>`;
+  }).join('');
+  
+  if (sorted.length > 150) {
+    tbody.innerHTML += `<tr><td colspan="14" style="text-align:center;color:var(--text-dim)">... et ${sorted.length - 150} autres lignes</td></tr>`;
+  } else if (sorted.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;color:var(--text-dim)">Aucun résultat${stressIdeaSearchTerm ? ' pour "' + stressIdeaSearchTerm + '"' : ''}</td></tr>`;
+  }
+}
+
+let detailSearchTerm = '';
+
+function renderDetailTable() {
+  const thead = document.querySelector('#mainTable thead');
+  const tbody = document.querySelector('#mainTable tbody');
+  
+  // Add search bar
+  const existingSearch = document.getElementById('detailSearch');
+  if (!existingSearch) {
+    const searchContainer = document.createElement('div');
+    searchContainer.id = 'searchContainer';
+    searchContainer.style.cssText = 'margin-bottom:1rem;position:relative;';
+    searchContainer.innerHTML = `
+      <input type="text" id="detailSearch" placeholder="Rechercher instrument, portfolio, stratégie..." 
+        style="width:100%;max-width:400px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:0.7rem 1rem;border-radius:8px;font-size:0.85rem;outline:none;">
+      <div id="autocompleteList" style="position:absolute;top:100%;left:0;width:100%;max-width:400px;max-height:250px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:none;z-index:100;margin-top:4px;"></div>
+    `;
+    document.getElementById('tablePanel').querySelector('.panel-title').after(searchContainer);
+    
+    const searchInput = document.getElementById('detailSearch');
+    const autocompleteList = document.getElementById('autocompleteList');
+    
+    searchInput.addEventListener('input', (e) => {
+      const val = e.target.value.toLowerCase();
+      detailSearchTerm = val;
+      
+      if (val.length < 2) {
+        autocompleteList.style.display = 'none';
+        renderDetailRows();
+        return;
+      }
+      
+      // Build suggestions
+      const suggestions = new Set();
+      processedData.forEach(r => {
+        if (r.instrument.toLowerCase().includes(val)) suggestions.add(r.instrument);
+        if (r.portfolio.toLowerCase().includes(val)) suggestions.add(r.portfolio);
+        if (r.strategy.toLowerCase().includes(val)) suggestions.add(r.strategy);
+        if (r.nlStrat.toLowerCase().includes(val)) suggestions.add(r.nlStrat);
+      });
+      
+      if (suggestions.size > 0) {
+        autocompleteList.innerHTML = [...suggestions].slice(0, 10).map(s => 
+          `<div class="autocomplete-item" style="padding:0.6rem 1rem;cursor:pointer;border-bottom:1px solid var(--border);font-size:0.8rem;transition:background 0.15s;"
+            onmouseover="this.style.background='var(--surface2)'" 
+            onmouseout="this.style.background='transparent'">${highlightMatch(s, val)}</div>`
+        ).join('');
+        autocompleteList.style.display = 'block';
+        
+        autocompleteList.querySelectorAll('.autocomplete-item').forEach(item => {
+          item.addEventListener('click', () => {
+            searchInput.value = item.textContent;
+            detailSearchTerm = item.textContent.toLowerCase();
+            autocompleteList.style.display = 'none';
+            renderDetailRows();
+          });
+        });
+      } else {
+        autocompleteList.style.display = 'none';
+      }
+      
+      renderDetailRows();
+    });
+    
+    searchInput.addEventListener('blur', () => {
+      setTimeout(() => { autocompleteList.style.display = 'none'; }, 200);
+    });
+    
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        searchInput.value = '';
+        detailSearchTerm = '';
+        autocompleteList.style.display = 'none';
+        renderDetailRows();
+      }
+    });
+  }
+  
+  thead.innerHTML = `<tr><th>Strategy</th><th>Portfolio</th><th>Instrument</th><th>NL Strat</th><th>Asset Class</th><th>Theta 1D</th><th>Theta 30D</th><th>Impact (bps)</th></tr>`;
+  renderDetailRows();
+}
+
+function highlightMatch(text, term) {
+  const idx = text.toLowerCase().indexOf(term);
+  if (idx === -1) return text;
+  return text.slice(0, idx) + '<strong style="color:var(--accent)">' + text.slice(idx, idx + term.length) + '</strong>' + text.slice(idx + term.length);
+}
+
+function renderDetailRows() {
+  const tbody = document.querySelector('#mainTable tbody');
+  
+  let filtered = [...processedData];
+  if (detailSearchTerm) {
+    filtered = filtered.filter(r => 
+      r.instrument.toLowerCase().includes(detailSearchTerm) ||
+      r.portfolio.toLowerCase().includes(detailSearchTerm) ||
+      r.strategy.toLowerCase().includes(detailSearchTerm) ||
+      r.nlStrat.toLowerCase().includes(detailSearchTerm) ||
+      r.assetClass.toLowerCase().includes(detailSearchTerm)
+    );
+  }
+  
+  const sorted = filtered.sort((a, b) => a.theta1d - b.theta1d);
+  
+  const countInfo = detailSearchTerm ? ` (${sorted.length}/${processedData.length} résultats)` : '';
+  
+  tbody.innerHTML = sorted.slice(0, 100).map(row => {
+    const badge = getBadgeClass(row.assetClass);
+    return `<tr>
+      <td>${row.strategy}</td>
+      <td>${row.portfolio}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${row.instrument}">${row.instrument}</td>
+      <td>${row.nlStrat}</td>
+      <td><span class="badge ${badge}">${row.assetClass}</span></td>
+      <td class="${row.theta1d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(row.theta1d)}</td>
+      <td class="${row.theta30d < 0 ? 'num-neg' : 'num-pos'}">${formatEur(row.theta30d)}</td>
+      <td class="${row.thetaBps < 0 ? 'num-neg' : 'num-pos'}">${row.thetaBps.toFixed(3)}</td>
+    </tr>`;
+  }).join('');
+  
+  if (sorted.length > 100) {
+    tbody.innerHTML += `<tr><td colspan="8" style="text-align:center;color:var(--text-dim)">... et ${sorted.length - 100} autres lignes${countInfo}</td></tr>`;
+  } else if (sorted.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-dim)">Aucun résultat pour "${detailSearchTerm}"</td></tr>`;
+  }
+}
+
+function getBadgeClass(ac) {
+  if (!ac) return 'badge-other';
+  const l = ac.toLowerCase();
+  if (l.includes('vol')) return 'badge-vol';
+  if (l.includes('eq')) return 'badge-eq';
+  if (l.includes('trading')) return 'badge-trading';
+  if (l.includes('credit')) return 'badge-credit';
+  return 'badge-other';
+}
+
+function formatEur(n) {
+  if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(2) + 'M €';
+  if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1) + 'K €';
+  return n.toFixed(0) + ' €';
+}
+
+function formatCompact(n) {
+  if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(0) + 'K';
+  return n.toFixed(0);
+}
+
+// Export
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const wb = XLSX.utils.book_new();
+  
+  // Summary sheet
+  const summaryData = [
+    ['BGF Optional Theta Analysis'],
+    ['Generated', new Date().toISOString()],
+    ['AUM', fundAum],
+    [],
+    ['Metric', 'Base', 'Mkt -10%', 'Mkt -20%'],
+    ['Total Theta 1D', processedData.reduce((s, r) => s + r.theta1d, 0), processedData.reduce((s, r) => s + r.theta10_1d, 0), processedData.reduce((s, r) => s + r.theta20_1d, 0)],
+    ['Total Theta 30D', processedData.reduce((s, r) => s + r.theta30d, 0), processedData.reduce((s, r) => s + r.theta10_30d, 0), processedData.reduce((s, r) => s + r.theta20_30d, 0)],
+    ['Total Impact (bps)', processedData.reduce((s, r) => s + r.thetaBps, 0), processedData.reduce((s, r) => s + r.theta10_bps, 0), processedData.reduce((s, r) => s + r.theta20_bps, 0)],
+    ['Positions', processedData.length]
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), 'Summary');
+  
+  // Detail sheet
+  const detailData = [
+    ['Strategy', 'Portfolio', 'Instrument', 'NL Strat', 'Asset Class', 'Strat Bucket', 'Main Strategy', 'Theta 1D', 'Theta 30D', 'Impact (bps)', 'Theta -10% 1D', 'Theta -10% 30D', '-10% bps', 'Theta -20% 1D', 'Theta -20% 30D', '-20% bps'],
+    ...processedData.map(r => [r.strategy, r.portfolio, r.instrument, r.nlStrat, r.assetClass, r.stratBucket, r.mainStrat, r.theta1d, r.theta30d, r.thetaBps, r.theta10_1d, r.theta10_30d, r.theta10_bps, r.theta20_1d, r.theta20_30d, r.theta20_bps])
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailData), 'Detail');
+  
+  // Aggregations
+  ['nlStrat', 'assetClass', 'stratBucket', 'mainStrat'].forEach(key => {
+    const agg = {};
+    processedData.forEach(row => {
+      const k = row[key] || 'N/A';
+      if (!agg[k]) agg[k] = { theta1d: 0, theta30d: 0, thetaBps: 0, count: 0 };
+      agg[k].theta1d += row.theta1d;
+      agg[k].theta30d += row.theta30d;
+      agg[k].thetaBps += row.thetaBps;
+      agg[k].count++;
+    });
+    const data = [
+      [key, 'Count', 'Theta 1D', 'Theta 30D', 'Impact (bps)'],
+      ...Object.entries(agg).sort((a, b) => a[1].theta1d - b[1].theta1d).map(([k, v]) => [k, v.count, v.theta1d, v.theta30d, v.thetaBps])
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), key);
+  });
+  
+  // Portfolio aggregation
+  const portfolioAgg = {};
+  processedData.forEach(row => {
+    const k = row.portfolio || 'N/A';
+    if (!portfolioAgg[k]) portfolioAgg[k] = { theta1d: 0, theta30d: 0, thetaBps: 0, count: 0, strategies: new Set(), assetClasses: new Set() };
+    portfolioAgg[k].theta1d += row.theta1d;
+    portfolioAgg[k].theta30d += row.theta30d;
+    portfolioAgg[k].thetaBps += row.thetaBps;
+    portfolioAgg[k].count++;
+    portfolioAgg[k].strategies.add(row.strategy);
+    portfolioAgg[k].assetClasses.add(row.assetClass);
+  });
+  const portfolioData = [
+    ['Portfolio', 'Instruments', 'Strategies', 'Asset Classes', 'Theta 1D', 'Theta 30D', 'Impact (bps)'],
+    ...Object.entries(portfolioAgg).sort((a, b) => a[1].theta1d - b[1].theta1d).map(([k, v]) => [k, v.count, v.strategies.size, [...v.assetClasses].join(', '), v.theta1d, v.theta30d, v.thetaBps])
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(portfolioData), 'Portfolio');
+  
+  // Stress Theta by Strategy sheet
+  const stressAgg = {};
+  processedData.forEach(row => {
+    const k = row.strategy || 'N/A';
+    if (!stressAgg[k]) stressAgg[k] = { theta1d:0, theta30d:0, thetaBps:0, theta10_1d:0, theta10_30d:0, theta10_bps:0, theta20_1d:0, theta20_30d:0, theta20_bps:0, count:0 };
+    stressAgg[k].theta1d += row.theta1d; stressAgg[k].theta30d += row.theta30d; stressAgg[k].thetaBps += row.thetaBps;
+    stressAgg[k].theta10_1d += row.theta10_1d; stressAgg[k].theta10_30d += row.theta10_30d; stressAgg[k].theta10_bps += row.theta10_bps;
+    stressAgg[k].theta20_1d += row.theta20_1d; stressAgg[k].theta20_30d += row.theta20_30d; stressAgg[k].theta20_bps += row.theta20_bps;
+    stressAgg[k].count++;
+  });
+  const stressData = [
+    ['Strategy', 'Pos', 'Base 1D', 'Base 30D', 'Base bps', '-10% 1D', '-10% 30D', '-10% bps', 'Δ-10% 30D', '-20% 1D', '-20% 30D', '-20% bps', 'Δ-20% 30D'],
+    ...Object.entries(stressAgg).sort((a,b) => a[1].theta10_30d - b[1].theta10_30d).map(([k,v]) => [
+      k, v.count, v.theta1d, v.theta30d, v.thetaBps, v.theta10_1d, v.theta10_30d, v.theta10_bps, v.theta10_30d - v.theta30d,
+      v.theta20_1d, v.theta20_30d, v.theta20_bps, v.theta20_30d - v.theta30d
+    ])
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(stressData), 'Stress Theta');
+  
+  XLSX.writeFile(wb, `BGF_Theta_Analysis_${new Date().toISOString().slice(0,10)}.xlsx`);
+});
+</script>
+</body>
+</html>
